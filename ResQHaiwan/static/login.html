@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ResQHaiwan</title>
+<style>
+:root{--ink:#1d2b2a;--bg:#f3f6f4;--line:#d5ded9;--teal:#0f6e66;--red:#c8372d}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--teal);color:#fff}
+#lang{background:#fff2;border:1px solid #fff8;color:#fff;border-radius:6px;padding:5px 10px;font:inherit;cursor:pointer}
+main{max-width:400px;margin:32px auto;padding:0 16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.tabs{display:flex;gap:6px}.tabs button{flex:1;padding:8px;border:1px solid var(--line);background:#fff;border-radius:8px;font:inherit;cursor:pointer}.tabs button.on{background:var(--teal);color:#fff}
+label{display:flex;flex-direction:column;gap:4px;font-size:14px}input{padding:10px;border:1px solid var(--line);border-radius:6px;font:inherit}
+.go{background:var(--teal);color:#fff;border:0;border-radius:8px;padding:12px;font:inherit;font-weight:600;cursor:pointer}
+#err{color:var(--red);margin:0;min-height:1.2em}.small{font-size:13px;color:#5d716e}a{color:var(--teal)}
+:focus-visible{outline:3px solid #ffbf47;outline-offset:2px}
+</style></head><body>
+<header><b>ResQHaiwan</b><button id="lang" type="button">Bahasa Melayu</button></header>
+<main><div class="card">
+  <h1 id="title" style="margin:0;font-size:22px"></h1>
+  <div class="tabs" id="tabs"><button type="button" data-m="login" data-i18n="lg_login"></button><button type="button" data-m="signup" data-i18n="lg_signup"></button></div>
+  <form id="f" style="display:flex;flex-direction:column;gap:12px">
+    <label id="lname"><span data-i18n="lg_name"></span><input name="name" autocomplete="name"></label>
+    <label><span data-i18n="lg_email"></span><input name="email" type="email" required autocomplete="email"></label>
+    <label id="lphone"><span data-i18n="lg_phone"></span><input name="phone" type="tel" autocomplete="tel"></label>
+    <label><span data-i18n="lg_pass"></span><input name="password" type="password" required minlength="8" autocomplete="current-password"></label>
+    <p id="err" role="alert"></p>
+    <button class="go" id="submit"></button>
+  </form>
+  <p id="demo" class="small" data-i18n="lg_demo" hidden></p>
+  <a id="anon" href="/" data-i18n="lg_guest"></a>
+</div></main>
+<script src="i18n.js?v=6"></script><script>
+Object.assign(I18N.en,{lg_welcome:"Welcome",lg_login:"Login",lg_signup:"Sign up",lg_email:"Email",lg_pass:"Password",lg_name:"Name",lg_phone:"Phone no.",lg_guest:"Guest",lg_alogin:"Authority login",lg_demo:"Demo login: officer@mpspk.demo or officer@perhilitan.demo, password demo1234",lg_err_role:"This is not an authority account.",e_login:"Wrong email or password",e_dup:"This email is already registered",e_bad:"Please fill in a valid name, email and a password of 8 or more characters"});
+Object.assign(I18N.ms,{lg_welcome:"Selamat datang",lg_login:"Log masuk",lg_signup:"Daftar",lg_email:"E-mel",lg_pass:"Kata laluan",lg_name:"Nama",lg_phone:"No. telefon",lg_guest:"Tetamu",lg_alogin:"Log masuk pihak berkuasa",lg_demo:"Log masuk demo: officer@mpspk.demo atau officer@perhilitan.demo, kata laluan demo1234",lg_err_role:"Ini bukan akaun pihak berkuasa.",e_login:"E-mel atau kata laluan salah",e_dup:"E-mel ini sudah didaftarkan",e_bad:"Sila isi nama, e-mel yang sah dan kata laluan 8 aksara atau lebih"});
+</script>
+<script>
+const q=new URLSearchParams(location.search),auth=q.get('role')==='authority';
+let mode=q.get('m')==='signup'&&!auth?'signup':'login';
+const $=s=>document.querySelector(s);
+function render(){
+  document.querySelectorAll('[data-m]').forEach(b=>b.classList.toggle('on',b.dataset.m===mode));
+  $('#tabs').hidden=auth;$('#anon').hidden=auth;$('#demo').hidden=!auth;
+  $('#lname').hidden=$('#lphone').hidden=mode!=='signup';
+  $('#title').textContent=t(auth?'lg_alogin':'lg_welcome');$('#submit').textContent=t(mode==='login'?'lg_login':'lg_signup');
+}
+document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{mode=b.dataset.m;render()});
+$('#f').onsubmit=async e=>{
+  e.preventDefault();$('#err').textContent='';
+  const d=Object.fromEntries(new FormData(e.target));
+  const r=await fetch('/api/'+mode,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok){const k={'Wrong email or password':'e_login','This email is already registered':'e_dup'}[j.detail]||(/^Please fill/.test(j.detail||'')?'e_bad':'');$('#err').textContent=k?t(k):(j.detail||'Error');return}
+  if(auth&&j.profile.role!=='authority'){$('#err').textContent=t('lg_err_role');return}
+  const pre=j.profile.role==='authority'?'a':'c';localStorage[pre+'token']=j.token;localStorage[pre+'profile']=JSON.stringify(j.profile);
+  location.href=j.profile.role==='authority'?'authority.html':'/';
+};
+window.onLang=render;document.addEventListener('DOMContentLoaded',render);
+</script></body></html>

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ResQHaiwan Authority</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+:root{--bg:#101a1c;--card:#182427;--line:#2a3b3f;--ink:#e6efee;--mute:#8fa6a3;--teal:#2fb5a8;--red:#e5483c;--amber:#f0a30a;--grey:#7b8a86}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line)}
+header h1{font-size:18px;margin:0}.live{color:var(--mute);font-size:13px}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+button,select{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid #ffbf47;outline-offset:2px}
+main{padding:14px 18px;max-width:1400px;margin:auto;display:grid;gap:14px}[hidden]{display:none!important}button.on{background:var(--teal);color:#101a1c}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.kpi b{display:block;font-size:34px;line-height:1.1}.kpi span{color:var(--mute);font-size:13px}
+.kpi.v b{color:var(--red)}.kpi.u b{color:var(--amber)}.kpi.r b{color:var(--teal)}
+.grid{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+#map{height:430px;border-radius:6px}
+h2{font-size:14px;margin:0 0 8px;color:var(--mute);font-weight:600}
+.side{display:grid;gap:14px;align-content:start}
+.bar{display:grid;grid-template-columns:130px 1fr 28px;gap:8px;align-items:center;margin:5px 0;font-size:13px}
+.bar i{display:block;height:10px;background:var(--teal);border-radius:5px}
+.hot{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;font-size:14px}
+th{color:var(--mute);font-weight:600}
+td img{width:64px;height:48px;object-fit:cover;border-radius:4px}
+#lb{position:fixed;inset:0;background:#000d;z-index:3000;display:flex;flex-direction:column;align-items:center;padding:16px;gap:10px}#lbv{flex:1;min-height:0;width:100%;overflow:auto;display:flex}img.zm{cursor:zoom-in}tr.row{cursor:pointer}tr.row:hover{background:#1d2e32}
+.tag{padding:2px 8px;border-radius:99px;font-size:12px;color:#101a1c;font-weight:600}
+.tag.verified{background:var(--red)}.tag.unverified{background:var(--amber)}.tag.low{background:var(--grey)}.tag.acknowledged{background:var(--teal)}
+a{color:var(--teal)}.small{color:var(--mute);font-size:12px}
+@media(max-width:900px){.kpis{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div><h1 data-i18n="a_title"></h1><div class="live" data-i18n="a_live"></div></div>
+  <div class="tools">
+    <b id="who"></b>
+    <button id="demo" type="button" data-i18n="a_demo"></button>
+    <button id="lang" type="button">Bahasa Melayu</button><button id="out" type="button" data-i18n="logout"></button>
+  </div>
+</header>
+<main>
+  <div class="tools"><button type="button" data-v="dash" id="tdash" data-i18n="a_dash"></button><button type="button" data-v="hist" data-i18n="a_history"></button></div>
+  <div id="dash" style="display:grid;gap:14px">
+  <section class="kpis">
+    <div class="card kpi"><b id="k1">0</b><span data-i18n="k_active"></span></div>
+    <div class="card kpi v"><b id="k2">0</b><span data-i18n="k_verified"></span></div>
+    <div class="card kpi u"><b id="k3">0</b><span data-i18n="k_unverified"></span></div>
+    <div class="card kpi r"><b id="k4">0</b><span data-i18n="k_resolved"></span></div>
+  </section>
+  <section class="grid">
+    <div class="card"><div id="map"></div></div>
+    <div class="side">
+      <div class="card"><h2 data-i18n="a_hot"></h2><div id="hot"></div></div>
+      <div class="card"><h2 data-i18n="a_cat"></h2><div id="cats"></div></div>
+      <div class="card"><h2 data-i18n="a_trend"></h2><svg id="trend" viewBox="0 0 240 60" width="100%" role="img"></svg></div>
+    </div>
+  </section>
+  <section class="card">
+    <h2 data-i18n="a_queue"></h2>
+    <table><thead><tr><th data-i18n="th_photo"></th><th data-i18n="th_report"></th><th data-i18n="th_contact"></th><th data-i18n="th_conf"></th><th data-i18n="th_age"></th><th data-i18n="th_status"></th><th data-i18n="th_action"></th></tr></thead>
+    <tbody id="rows"></tbody></table>
+    <p id="empty" data-i18n="empty" hidden></p>
+  </section>
+  </div>
+  <section class="card" id="hist" hidden>
+    <h2 data-i18n="a_history"></h2>
+    <div class="tools" style="margin-bottom:8px"><select id="hs"><option value="" data-i18n="h_all"></option><option value="verified" data-i18n="st_verified"></option><option value="unverified" data-i18n="st_unverified"></option><option value="low" data-i18n="st_low"></option><option value="acknowledged" data-i18n="st_acknowledged"></option><option value="resolved" data-i18n="st_resolved"></option><option value="false" data-i18n="st_false"></option></select>
+    <input id="hq" data-ph="h_search" style="background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font:inherit"></div>
+    <table><thead><tr><th data-i18n="th_when"></th><th data-i18n="th_report"></th><th data-i18n="th_contact"></th><th data-i18n="th_status"></th><th data-i18n="th_log"></th></tr></thead><tbody id="hrows"></tbody></table>
+  </section>
+</main>
+<div id="lb" hidden role="dialog" aria-modal="true">
+  <div class="tools"><button id="zm" type="button" aria-label="Zoom out">−</button><button id="zp" type="button" aria-label="Zoom in">+</button><button id="lbx" type="button" data-i18n="close"></button></div>
+  <div id="lbv"><img id="lbi" alt="" style="margin:auto;max-width:100%;max-height:100%"></div>
+  <p id="lbc" class="small" style="margin:0"></p>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="i18n.js?v=6"></script><script src="i18n2.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const tok=localStorage.atoken,me=JSON.parse(localStorage.aprofile||'null');
+if(!tok||!me||me.role!=='authority')location.replace('login.html?role=authority');
+function logout(){localStorage.removeItem('atoken');localStorage.removeItem('aprofile');location.replace('login.html?role=authority')}
+async function api(p,o={}){
+  const r=await fetch(p,{...o,headers:{Authorization:'Bearer '+tok,...(o.headers||{})}});
+  if(r.status===401){logout();throw new Error('login')}
+  const d=await r.json();if(!r.ok)throw new Error(d.detail);return d}
+const COL={verified:'#e5483c',unverified:'#f0a30a',low:'#7b8a86',acknowledged:'#2fb5a8'};
+const map=L.map('map').setView([5.647,100.487],14);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
+const heat=L.layerGroup().addTo(map);let markers={};
+
+const ct=r=>{const c=r.contact||{};return `${esc(c.name)}<br>${c.phone?`<a href="tel:${esc(c.phone)}">${esc(c.phone)}</a> `:''}${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:''}${!c.phone&&!c.email?`<span class="small">${t('no_contact')}</span>`:''}`};
+async function act(id,s){
+  if(!s)return;const n=s==='acknowledged'?'':prompt(t('note_ph'));
+  if(n===null){load();return}
+  await api(`/api/reports/${id}/status`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:s,note:n})});load()}
+function focusOn(lat,lng){$('#tdash').click();map.flyTo([lat,lng],17)}
+document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-v]').forEach(x=>x.classList.toggle('on',x===b));
+  $('#dash').hidden=b.dataset.v!=='dash';$('#hist').hidden=b.dataset.v!=='hist';map.invalidateSize()});
+$('#tdash').classList.add('on');
+let z=1,lbUrl=null;
+function setZoom(v){z=Math.min(4,Math.max(1,v));$('#lbi').style.cssText=z===1?'margin:auto;max-width:100%;max-height:100%':`margin:0;width:${z*100}%;max-width:none;max-height:none`}
+async function openPhoto(id){
+  const r=ALL.find(x=>x.id===id);if(!r)return;
+  const res=await fetch(`/api/reports/${id}/photo`,{headers:{Authorization:'Bearer '+tok}});if(!res.ok)return;
+  if(lbUrl)URL.revokeObjectURL(lbUrl);lbUrl=URL.createObjectURL(await res.blob());
+  $('#lbi').src=lbUrl;setZoom(1);
+  $('#lbc').textContent=`${t(catKey(r.animal,r.category))} · ${Math.round(r.confidence*100)}% · ${r.why.map(whyText).join('; ')}`;$('#lb').hidden=false}
+const closePhoto=()=>{$('#lb').hidden=true};
+$('#lbx').onclick=closePhoto;$('#zp').onclick=()=>setZoom(z+.5);$('#zm').onclick=()=>setZoom(z-.5);
+$('#lbi').onclick=()=>setZoom(z===1?2:1);
+$('#lb').onclick=e=>{if(e.target.id==='lb'||e.target.id==='lbv')closePhoto()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePhoto()});
+let ALL=[];const catKey=(a,c)=>(a==='wildlife'?'wcat_':'cat_')+c;
+function renderHist(){
+  const st=$('#hs').value,q=$('#hq').value.toLowerCase();
+  const rs=ALL.filter(r=>(!st||r.status===st)&&(!q||(r.category+' '+r.note+' '+JSON.stringify(r.contact)).toLowerCase().includes(q)));
+  $('#hrows').innerHTML=rs.map(r=>`<tr><td>${new Date(r.created*1000).toLocaleString()}</td><td>${r.thumb?`<img class="zm" src="${r.thumb}" alt="" style="float:left;margin-right:8px" onclick="openPhoto('${r.id}')">`:''}<b>${t(catKey(r.animal,r.category))}</b>${r.dog_count?` · ${t('dogs_n',r.dog_count)}`:''}<br><span class="small">${esc(r.note)}</span></td><td>${ct(r)}</td>
+    <td><span class="tag ${r.status}">${t('st_'+r.status)}</span></td>
+    <td class="small">${r.history.map(h=>`${new Date(h.ts*1000).toLocaleString()} · ${t('st_'+h.status)}${h.note?': '+esc(h.note):''}`).join('<br>')}</td></tr>`).join('')}
+$('#hs').onchange=$('#hq').oninput=renderHist;
+async function loadOnce(){
+  const [all,st]=await Promise.all([api('/api/admin/reports'),api('/api/stats')]);
+  ALL=all;const rs=all.filter(r=>r.open).sort((a,b)=>b.priority-a.priority);
+  $('#k1').textContent=st.active;$('#k2').textContent=st.verified;$('#k3').textContent=st.unverified;$('#k4').textContent=st.resolved;
+  heat.clearLayers();
+  st.hotspots.forEach(h=>L.circle([h.lat,h.lng],{radius:90+h.n*35,stroke:false,fillColor:'#e5483c',fillOpacity:Math.min(.5,.12+h.weight/70)}).addTo(heat));
+  $('#hot').innerHTML=st.hotspots.length?st.hotspots.slice(0,5).map(h=>`<div class="hot" onclick="focusOn(${h.lat},${h.lng})"><span>${h.lat.toFixed(4)}, ${h.lng.toFixed(4)}</span><b>${t('hot_n',h.n)}</b></div>`).join(''):`<span class="small">${t('a_nohot')}</span>`;
+  const mx=Math.max(1,...Object.values(st.by_cat));
+  $('#cats').innerHTML=Object.entries(st.by_cat).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<div class="bar"><span>${t((me.agency==='PERHILITAN'?'wcat_':'cat_')+c)}</span><i style="width:${n/mx*100}%"></i><b>${n}</b></div>`).join('');
+  const hm=Math.max(1,...st.hourly),X=i=>6+i*(228/11),Y=v=>52-v/hm*44;
+  $('#trend').innerHTML=`<polyline points="${st.hourly.map((v,i)=>X(i)+','+Y(v)).join(' ')}" fill="none" stroke="#2fb5a8" stroke-width="2.5"/>`+st.hourly.map((v,i)=>`<circle cx="${X(i)}" cy="${Y(v)}" r="2.5" fill="#2fb5a8"/>`).join('');
+  const ids=new Set(rs.map(r=>r.id));
+  for(const id in markers)if(!ids.has(id)){map.removeLayer(markers[id]);delete markers[id]}
+  rs.forEach(r=>{const c=COL[r.status]||'#7b8a86';
+    if(!markers[r.id])markers[r.id]=L.circleMarker([r.lat,r.lng],{radius:8}).addTo(map);
+    markers[r.id].setStyle({color:c,fillColor:c,fillOpacity:.85}).bindPopup(`<b>${t(catKey(r.animal,r.category))}</b><br>${t('st_'+r.status)}`)});
+  $('#empty').hidden=rs.length>0;
+  if(!document.activeElement?.closest?.('#rows'))$('#rows').innerHTML=rs.map(r=>`<tr class="row" onclick="focusOn(${r.lat},${r.lng})"><td onclick="event.stopPropagation()">${r.thumb?`<img class="zm" src="${r.thumb}" alt="" title="Zoom" onclick="openPhoto('${r.id}')">`:'-'}</td>
+    <td><b>${t(catKey(r.animal,r.category))}</b>${r.dog_count?` · ${t('dogs_n',r.dog_count)}`:''}<br><span class="small">${esc(r.note)}</span></td><td>${ct(r)}</td>
+    <td>${Math.round(r.confidence*100)}%<br><span class="small">${r.why.map(whyText).join('; ')}</span></td>
+    <td>${t('ago',r.age_min)}</td><td><span class="tag ${r.status}">${t('st_'+r.status)}</span></td>
+    <td onclick="event.stopPropagation()"><a target="_blank" rel="noopener" href="https://waze.com/ul?ll=${r.lat},${r.lng}&navigate=yes">${t('nav')}</a><br>
+    <select onchange="act('${r.id}',this.value)"><option value="">${t('upd')}</option><option value="acknowledged">${t('ack')}</option><option value="resolved">${t('st_resolved')}</option><option value="false">${t('a_false')}</option><option value="followup">${t('a_msg')}</option></select></td></tr>`).join('');
+  renderHist();
+}
+let busy=false;
+async function load(){if(busy)return;busy=true;try{await loadOnce()}catch(e){}finally{busy=false}}
+$('#demo').onclick=async()=>{await api('/api/seed',{method:'POST'});load()};
+$('#out').onclick=logout;
+window.onLang=load;
+$('#who').textContent=me.name+' · '+me.agency;
+load();setInterval(load,3000);
+</script>
+<script>if(!I18N.en.wcat_pack)document.body.insertAdjacentHTML('afterbegin','<p style="background:#c8372d;color:#fff;margin:0;padding:10px 16px;font-weight:600">Old i18n.js detected. Replace static/i18n.js with the latest version, then refresh with Ctrl+F5.</p>')</script>
+</body>
+</html>

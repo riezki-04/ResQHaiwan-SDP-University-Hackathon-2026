@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ResQHaiwan</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+:root{--ink:#1d2b2a;--bg:#f3f6f4;--line:#d5ded9;--teal:#0f6e66;--red:#c8372d;--amber:#d98e04;--grey:#7b8a86}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 16px;background:var(--teal);color:#fff}
+header b{font-size:20px}#hdr{display:flex;gap:14px;align-items:center;font-size:14px;flex-wrap:wrap}#hdr a{color:#fff}
+#lang{background:#fff2;border:1px solid #fff8;color:#fff;border-radius:6px;padding:5px 10px;font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid #ffbf47;outline-offset:2px}
+#alert{background:var(--red);color:#fff;padding:10px 16px;font-weight:600}#note{background:var(--teal);color:#fff;padding:10px 16px;font-weight:600;cursor:pointer}
+.wrap{display:grid;grid-template-columns:1fr 380px;gap:12px;padding:12px;max-width:1200px;margin:auto}
+#map{height:70vh;min-height:360px;border-radius:8px;border:1px solid var(--line)}
+.panel{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.col{display:flex;flex-direction:column;gap:10px}
+.sos{background:var(--red);color:#fff;border:0;border-radius:8px;padding:16px;font-size:20px;font-weight:700;cursor:pointer}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opts button{padding:14px 8px;border:2px solid var(--teal);background:#fff;border-radius:8px;font:inherit;font-weight:600;cursor:pointer}
+.steps{margin:8px 0 0;padding-left:20px}.steps li{margin:6px 0;font-size:18px}
+label{display:flex;flex-direction:column;gap:4px;font-size:14px}
+select,input[type=text],input[type=tel],input[type=email]{padding:8px;border:1px solid var(--line);border-radius:6px;font:inherit}
+.go{background:var(--teal);color:#fff;border:0;border-radius:8px;padding:12px;font:inherit;font-weight:600;cursor:pointer}
+.res{border-left:5px solid var(--grey);padding:8px 10px;background:#f6f8f7;font-size:14px;margin:6px 0}
+.res.verified{border-color:var(--red)}.res.unverified{border-color:var(--amber)}.res.resolved{border-color:var(--teal)}
+.tabs{display:flex;gap:6px}.tabs button{flex:1;padding:8px;border:1px solid var(--line);background:#fff;border-radius:8px;font:inherit;cursor:pointer}.tabs button.on{background:var(--teal);color:#fff}
+.tag{padding:2px 8px;border-radius:99px;color:#fff;font-size:12px;background:var(--grey)}.tag.verified{background:var(--red)}.tag.unverified{background:var(--amber)}.tag.resolved{background:var(--teal)}
+.small{font-size:12px;color:var(--grey)}h3{margin:6px 0 0;font-size:15px}
+.chat{position:fixed;right:12px;bottom:12px;width:340px;max-width:calc(100% - 24px);background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 18px #0003;z-index:1000}
+.chat header{padding:8px 12px;font-size:15px}#msgs{height:200px;overflow:auto;padding:8px;font-size:14px}#msgs p{margin:4px 0}
+.chat form{display:flex;gap:6px;padding:8px}.chat input{flex:1;min-width:0;padding:8px;border:1px solid var(--line);border-radius:6px;font:inherit}
+@media(max-width:800px){.wrap{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><b>ResQHaiwan</b><div id="hdr"></div><button id="lang" type="button">Bahasa Melayu</button></header>
+<div id="note" role="status" hidden></div>
+<div id="alert" role="alert" hidden></div>
+<div class="wrap">
+  <div><div id="map"></div><small data-i18n="c_hint"></small></div>
+  <div class="panel">
+    <div class="tabs" id="tabs" hidden><button data-v="rep" class="on" data-i18n="report_tab"></button><button data-v="mine" data-i18n="my_reports"></button></div>
+    <div id="vRep" class="col">
+      <button class="sos" id="sos" data-i18n="c_sos"></button>
+      <div id="guide" hidden>
+        <div class="opts">
+          <button data-g="chasing" data-i18n="g_chasing"></button><button data-g="bitten" data-i18n="g_bitten"></button>
+          <button data-g="nearby" data-i18n="g_nearby"></button><button data-g="safe" data-i18n="g_safe"></button>
+        </div>
+        <ol class="steps" id="steps"></ol>
+      </div>
+      <hr style="width:100%;border:0;border-top:1px solid var(--line)">
+      <p id="who" class="small" style="margin:0"></p>
+      <form id="form" class="col">
+        <label><span data-i18n="f_what"></span>
+          <select name="category">
+            <option value="sighting" data-i18n="cat_sighting"></option><option value="pack" data-i18n="cat_pack"></option>
+            <option value="aggressive" data-i18n="cat_aggressive"></option><option value="chasing" data-i18n="cat_chasing"></option>
+            <option value="attack" data-i18n="cat_attack"></option><option value="injured" data-i18n="cat_injured"></option>
+          </select></label>
+        <label><span data-i18n="f_animal"></span>
+          <select name="animal"><option value="dog" data-i18n="an_dog"></option><option value="wildlife" data-i18n="an_wildlife"></option></select></label>
+        <div class="col"><span style="font-size:14px" data-i18n="f_photo"></span>
+          <button type="button" class="go" id="snapBtn" data-i18n="snap"></button>
+          <img id="snapPrev" alt="" hidden style="max-width:100%;border-radius:8px">
+          <input type="file" name="photo" accept="image/*" aria-label="Photo">
+          <input type="file" id="camIn" accept="image/*" capture="environment" hidden></div>
+        <label style="flex-direction:row;gap:8px;align-items:center"><input type="checkbox" name="left_frame" value="true"><span id="leftL" data-i18n="f_left"></span></label>
+        <label><span data-i18n="f_note"></span><input type="text" name="note" maxlength="200" data-ph="ph_note"></label>
+        <div id="anonc" class="col">
+          <label><span data-i18n="f_cphone"></span><input type="tel" name="contact_phone" maxlength="20"></label>
+          <label><span data-i18n="f_cemail"></span><input type="email" name="contact_email" maxlength="80"></label>
+        </div>
+        <button class="go" data-i18n="f_send"></button>
+        <p id="tip" class="small" style="margin:0"></p>
+      </form>
+      <div id="result"></div>
+    </div>
+    <div id="vMine" class="col" hidden>
+      <h3 data-i18n="notif"></h3><div id="notes"></div>
+      <h3 data-i18n="my_reports"></h3><div id="mylist"></div>
+    </div>
+  </div>
+</div>
+<div id="cam" hidden style="position:fixed;inset:0;background:#000;z-index:2000;display:flex;flex-direction:column">
+  <video id="camv" autoplay playsinline muted style="flex:1;min-height:0;width:100%;object-fit:cover"></video>
+  <div style="display:flex;gap:12px;justify-content:center;padding:16px"><button type="button" id="camX" class="go" style="background:#555" data-i18n="close"></button><button type="button" id="camShot" class="go" style="background:#fff;color:#000;padding:14px 32px" data-i18n="snap_cap"></button></div>
+</div>
+<div class="chat" id="chat" hidden>
+  <header><span data-i18n="discuss_t"></span><button type="button" id="cx" style="background:none;border:0;color:#fff;cursor:pointer;font-size:18px" aria-label="Close">×</button></header>
+  <div id="msgs"></div>
+  <form id="chatform"><input name="text" maxlength="200" data-ph="chat_ph" autocomplete="off"><button class="go" data-i18n="chat_send"></button></form>
+  <p id="chatlogin" class="small" style="padding:0 8px 8px;margin:0"><a href="login.html" data-i18n="chat_login"></a></p>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="i18n.js?v=6"></script><script src="i18n2.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const ALERT_RADIUS_M=1000;
+let token=localStorage.ctoken||'',user=JSON.parse(localStorage.cprofile||'null');
+let me={lat:5.647,lng:100.487},markers={},alerted=new Set(),seen=new Set(),captured=0,lastG=null,lastR=null,chatId=null;
+const H=()=>token?{Authorization:'Bearer '+token}:{};
+async function api(p,o={}){
+  const r=await fetch(p,{...o,headers:{...H(),...(o.headers||{})}});
+  if(r.status===401&&token){logout();throw new Error('login')}
+  const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.detail||r.status);return d}
+function logout(){localStorage.removeItem('ctoken');localStorage.removeItem('cprofile');location.reload()}
+const badge=p=>p>=150?t('b_gold'):p>=50?t('b_silver'):t('b_bronze');
+function renderHdr(){
+  $('#hdr').innerHTML=user?`<span>${t('hi',esc(user.name.split(' ')[0]))}</span><span>★ ${t('pts',user.points)} · ${badge(user.points)}</span>${user.unread?`<span class="tag verified">${user.unread}</span>`:''}<a href="#" id="out">${t('logout')}</a>`
+    :`<a href="login.html">${t('login')}</a><a href="login.html?m=signup">${t('signup')}</a>`;
+  if(user)$('#out').onclick=e=>{e.preventDefault();logout()};
+  $('#tabs').hidden=!user;$('#anonc').hidden=!!user;
+  $('#who').textContent=user?t('as_user',user.name):t('anon_note');$('#tip').textContent=user?t('rew_tip'):'';}
+
+const map=L.map('map').setView([me.lat,me.lng],14);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
+const meM=L.circleMarker(me,{radius:8,color:'#0a58ca',fillOpacity:1}).addTo(map);
+const setMe=ll=>{me={lat:ll.lat,lng:ll.lng};meM.setLatLng(ll)};
+map.on('click',e=>setMe(e.latlng));
+navigator.geolocation?.getCurrentPosition(p=>{setMe({lat:p.coords.latitude,lng:p.coords.longitude});map.setView(me,15)});
+const dist=(a,b)=>{const r=Math.PI/180,x=Math.sin((b.lat-a.lat)*r/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin((b.lng-a.lng)*r/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
+const COL={verified:'#c8372d',unverified:'#d98e04',low:'#7b8a86',acknowledged:'#0f6e66'};
+
+$('#sos').onclick=()=>{$('#guide').hidden=!$('#guide').hidden};
+async function showGuide(){
+  if(!lastG)return;
+  const d=await (await fetch(`/api/guidance/${lastG}?lang=${LANG}`)).json();
+  $('#steps').innerHTML=d.steps.map(s=>`<li>${esc(s)}</li>`).join('');
+  if('speechSynthesis' in window){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(d.steps.join(' '));u.lang=LANG==='ms'?'ms-MY':'en-US';speechSynthesis.speak(u)}}
+document.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{lastG=b.dataset.g;showGuide()});
+
+function showResult(){
+  const r=lastR;if(!r){$('#result').innerHTML='';return}
+  $('#result').innerHTML=`<div class="res ${r.status}"><b>${t('r_sent',esc(r.authority))}</b><br>
+    ${t('r_status')}: ${t('st_'+r.status)} (${t('r_conf')} ${Math.round(r.confidence*100)}%)<br>${r.why.map(w=>'• '+whyText(w)).join('<br>')}
+    ${r.status!=='verified'?`<br><i>${t('r_wait')}</i>`:''}</div>`}
+const animalSel=$('#form [name=animal]');
+const catKey=(a,c)=>(a==='wildlife'?'wcat_':'cat_')+c;
+function syncAnimal(){
+  const w=animalSel.value==='wildlife';
+  document.querySelectorAll('#form [name=category] option').forEach(o=>{o.dataset.i18n=catKey(animalSel.value,o.value);o.textContent=t(o.dataset.i18n)});
+  const ni=$('#form [name=note]');ni.dataset.ph=w?'ph_note_w':'ph_note';ni.placeholder=t(ni.dataset.ph);
+  $('#leftL').dataset.i18n=w?'f_left_w':'f_left';$('#leftL').textContent=t(w?'f_left_w':'f_left')}
+animalSel.onchange=syncAnimal;
+let snapFile=null,stream=null;
+const photoIn=$('#form [name=photo]');
+function preview(f){$('#snapPrev').src=URL.createObjectURL(f);$('#snapPrev').hidden=false}
+photoIn.onchange=()=>{const f=photoIn.files[0];snapFile=null;captured=f?f.lastModified||0:0;if(f)preview(f);else $('#snapPrev').hidden=true};
+$('#camIn').onchange=e=>{const f=e.target.files[0];if(!f)return;snapFile=f;captured=f.lastModified||Date.now();photoIn.value='';preview(f);$('#snapBtn').textContent=t('snap_retake');e.target.value=''};
+const stopCam=()=>{stream?.getTracks().forEach(k=>k.stop());stream=null;$('#cam').hidden=true};
+$('#snapBtn').onclick=async()=>{
+  if(!navigator.mediaDevices?.getUserMedia){$('#camIn').click();return}   // live camera needs HTTPS or localhost; fallback opens the phone camera app
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+    $('#camv').srcObject=stream;$('#cam').hidden=false}
+  catch(e){$('#camIn').click()}};
+$('#camShot').onclick=()=>{
+  const v=$('#camv'),c=document.createElement('canvas'),k=Math.min(1,1280/(v.videoWidth||1280));
+  c.width=v.videoWidth*k;c.height=v.videoHeight*k;c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+  c.toBlob(b=>{snapFile=new File([b],'snap.jpg',{type:'image/jpeg'});captured=Date.now();
+    $('#snapPrev').src=URL.createObjectURL(b);$('#snapPrev').hidden=false;$('#snapBtn').textContent=t('snap_retake');stopCam()},'image/jpeg',.85)};
+$('#camX').onclick=stopCam;
+$('#form').onsubmit=async e=>{
+  e.preventDefault();
+  const fd=new FormData(e.target);fd.append('lat',me.lat);fd.append('lng',me.lng);fd.append('captured_at',captured);
+  if(snapFile)fd.set('photo',snapFile,'snap.jpg');else if(!fd.get('photo')?.name)fd.delete('photo');
+  try{lastR=await api('/api/report',{method:'POST',body:fd});showResult()}
+  catch(err){if(err.message==='login')return;$('#result').innerHTML=`<div class="res">${esc(/Too many/.test(err.message)?t('err_rate'):err.message)}</div>`;return}
+  e.target.reset();syncAnimal();captured=0;snapFile=null;$('#snapPrev').hidden=true;$('#snapBtn').textContent=t('snap');poll();};
+
+async function confirmIt(id){try{await api(`/api/reports/${id}/confirm`,{method:'POST'})}catch(e){}load()}
+async function reopen(id){await api(`/api/reports/${id}/reopen`,{method:'POST'});loadMine();load()}
+
+function openChat(id){chatId=id;$('#chat').hidden=false;$('#chatform').hidden=!user;$('#chatlogin').hidden=!!user;loadChat()}
+$('#cx').onclick=()=>{$('#chat').hidden=true;chatId=null};
+async function loadChat(){
+  if(!chatId)return;
+  const m=await (await fetch(`/api/reports/${chatId}/chat`)).json();
+  $('#msgs').innerHTML=m.length?m.map(x=>`<p><b>${esc(x.name)}${x.role==='authority'?' ✓':''}</b> ${esc(x.text)}</p>`).join(''):`<p class="small">${t('chat_empty')}</p>`;
+  $('#msgs').scrollTop=1e6}
+$('#chatform').onsubmit=async e=>{
+  e.preventDefault();const i=e.target.text;if(!i.value.trim())return;
+  try{await api(`/api/reports/${chatId}/chat`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:i.value})})}catch(x){}
+  i.value='';loadChat()};
+
+document.querySelectorAll('#tabs [data-v]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#tabs [data-v]').forEach(x=>x.classList.toggle('on',x===b));
+  $('#vRep').hidden=b.dataset.v!=='rep';$('#vMine').hidden=b.dataset.v!=='mine';
+  if(b.dataset.v==='mine')loadMine()});
+async function loadMine(){
+  const [rs,ns]=await Promise.all([api('/api/my/reports'),api('/api/notifications')]);
+  $('#notes').innerHTML=ns.length?ns.map(n=>`<div class="res ${n.read?'':'unverified'}">${t('n_'+n.type)}${n.note?`<br><i>${esc(n.note)}</i>`:''}</div>`).join(''):'<span class="small">-</span>';
+  $('#mylist').innerHTML=rs.length?rs.map(r=>{const h=r.history[r.history.length-1];
+    return `<div class="res ${r.status}"><b>${t(catKey(r.animal,r.category))}</b> <span class="tag ${r.status}">${t('st_'+r.status)}</span><br><span class="small">${new Date(r.created*1000).toLocaleString()}</span>${h&&h.note?`<br><i>${esc(h.note)}</i>`:''}<br>
+    ${r.status==='resolved'?`<button onclick="reopen('${r.id}')">${t('reopen')}</button> `:''}<button onclick="openChat('${r.id}')">${t('discuss',r.chat)}</button></div>`}).join(''):`<span class="small">${t('mine_empty')}</span>`;
+  await api('/api/notifications/read',{method:'POST'})}
+
+async function load(){
+  const reports=await (await fetch('/api/reports')).json();
+  const ids=new Set(reports.map(r=>r.id));
+  for(const id in markers)if(!ids.has(id)){map.removeLayer(markers[id]);delete markers[id]}
+  reports.forEach(r=>{
+    const col=COL[r.status],op=Math.max(.35,1-r.age_min/360);
+    const html=`<b>${t(catKey(r.animal,r.category))}</b> · ${t('st_'+r.status)}<br>${t('ago',r.age_min)}<br><button onclick="confirmIt('${r.id}')">${t('still')}</button> <button onclick="openChat('${r.id}')">${t('discuss',r.chat)}</button>`;
+    if(!markers[r.id])markers[r.id]=L.circleMarker([r.lat,r.lng],{radius:11}).addTo(map).bindPopup(html);
+    markers[r.id].setStyle({color:col,fillColor:col,fillOpacity:op}).setPopupContent(html);
+    if(r.status==='verified'&&!alerted.has(r.id)&&dist(me,r)<ALERT_RADIUS_M){
+      alerted.add(r.id);$('#alert').hidden=false;$('#alert').textContent=t('alert',Math.round(dist(me,r)));}});
+}
+$('#note').onclick=()=>{$('#note').hidden=true};
+async function poll(){
+  await load();loadChat();
+  if(!user)return;
+  try{user=await api('/api/me');localStorage.cprofile=JSON.stringify(user);renderHdr();
+    const ns=await api('/api/notifications'),n=ns.find(x=>!x.read&&!seen.has(x.id));
+    if(n){seen.add(n.id);$('#note').hidden=false;$('#note').textContent=t('n_'+n.type)+(n.note?' '+n.note:'')}
+    if(!$('#vMine').hidden)loadMine()}catch(e){}}
+window.onLang=()=>{renderHdr();showResult();showGuide();load();if(user&&!$('#vMine').hidden)loadMine()};
+Object.assign(I18N.en,{discuss_t:'Discussion',snap:'Take photo',snap_cap:'Snap',snap_retake:'Retake photo',snap_err:'Camera not available here. Please choose a photo instead.'});Object.assign(I18N.ms,{discuss_t:'Perbincangan',snap:'Ambil gambar',snap_cap:'Tangkap',snap_retake:'Ambil semula',snap_err:'Kamera tidak tersedia di sini. Sila pilih gambar.'});
+renderHdr();poll();setInterval(poll,5000);
+</script>
+<script>if(!I18N.en.wcat_pack)document.body.insertAdjacentHTML('afterbegin','<p style="background:#c8372d;color:#fff;margin:0;padding:10px 16px;font-weight:600">Old i18n.js detected. Replace static/i18n.js with the latest version, then refresh with Ctrl+F5.</p>')</script>
+</body>
+</html>
